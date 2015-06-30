@@ -145,7 +145,6 @@ class BaseHandler(tornado.web.RequestHandler):
     def authorized(method):
         @functools.wraps(method)
         def wrapper(self, *args, **kwargs):
-            print(self.current_user)
             if not self.application.acl.is_authorized(self.current_user):
                 self.clear_cookie("sid")
                 raise tornado.web.HTTPError(403)
@@ -227,13 +226,13 @@ class TickerHandler(BaseHandler):
 
 
 class Application(tornado.web.Application):
-    def __init__(self, google_oauth, gpio):
+    def __init__(self, gpio, **settings):
         handlers = [
             (r"/auth/login", AuthLoginHandler),
             (r"/auth/logout", AuthLogoutHandler),
             (r"/([^/]*)", TickerHandler),
         ]
-        settings = dict(
+        app_settings = dict(
             site_title=u"Garage Clicker",
             template_path=os.path.join(os.path.dirname(__file__), "templates"),
             static_path=os.path.join(os.path.dirname(__file__), "static"),
@@ -241,18 +240,17 @@ class Application(tornado.web.Application):
             # random secret, assuming we don't store sessions
             cookie_secret=base64.b64encode(os.urandom(50)),
             login_url="/auth/login",
-            google_oauth=google_oauth,
-            # debug=True,
             autoreload=True
         )
-        tornado.web.Application.__init__(self, handlers, **settings)
+        app_settings.update(settings)
+        tornado.web.Application.__init__(self, handlers, **app_settings)
 
         self.ticker = OutputTicker(gpio)
         self.sessions = SessionStore()
         self.acl = AccessControlList()
 
-    def add_user(self, email):
-        self.acl.add_user(email)
+    def add_user(self, user_email):
+        self.acl.add_user(user_email)
 
 
 if __name__ == "__main__":
@@ -268,14 +266,14 @@ if __name__ == "__main__":
                    help="run on the given port",
                    type=int)
 
+    options.define("debug", default=False,
+                   type=bool, group="application")
     options.define("google_oauth",
                    help="should contain key and secret",
-                   type=dict
-                   )
-
+                   type=dict, group="application")
     options.define("gpio", default=0,
                    help="RPi GPIO port in GPIO.BCM scheme",
-                   type=int)
+                   type=int, group="application")
     options.define("authorized",
                    help="list of authorized google accounts",
                    type=str, multiple=True)
@@ -284,9 +282,7 @@ if __name__ == "__main__":
     options.parse_config_file(options.config, final=False)
     options.parse_command_line()
 
-    app = Application(options.google_oauth,
-        gpio=options.gpio
-    )
+    app = Application(**options.group_dict("application"))
     for email in options.authorized:
         app.add_user(email)
 
