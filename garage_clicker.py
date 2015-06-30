@@ -196,6 +196,9 @@ class AuthLogoutHandler(BaseHandler):
 
 
 class TickerHandler(BaseHandler):
+    def initialize(self):
+        self.rhash = None
+
     @property
     def ticker(self):
         return self.application.ticker
@@ -204,25 +207,11 @@ class TickerHandler(BaseHandler):
     @BaseHandler.authorized
     def get(self, rhash):
         if self.ticker.check_rhash(rhash):
-            self.write("""<html>
-            <head>
-            <meta http-equiv="refresh" content="3">
-            </head>
-            <body>
-            <h1>TICK!<h2>
-            </body>
-            </html>
-            """)
+            self.render("clicky_pause.html")
             self.ticker.recompute_rhash()
             self.ticker.tick()
         else:
-            self.write("""<form action="%s" method="get">
-                <input type="submit" value="tickme" style="height: 20%%; width: 100%%; font-size: 4em;">
-                </form>
-            """ % self.ticker.rhash)
-
-    def initialize(self):
-        self.rhash = None
+            self.render("clicky.html", code=self.ticker.rhash)
 
 
 class Application(tornado.web.Application):
