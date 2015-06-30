@@ -1,0 +1,7 @@
+port = 8888
+google_oauth = dict(
+    key="googleauthkey.apps.googleusercontent.com",
+    secret="googlesecret"
+)
+authorized = ["bob@example.com","alice@example.com"]
+gpio = 0
