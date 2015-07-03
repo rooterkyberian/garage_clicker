@@ -18,7 +18,10 @@ import tornado.httpserver
 import tornado.ioloop
 import tornado.options
 import tornado.web
-import tornado.options
+import tornado.gen
+import tornado.concurrent
+
+from concurrent.futures import ThreadPoolExecutor
 
 try:
     import RPi.GPIO as GPIO
@@ -196,6 +199,8 @@ class AuthLogoutHandler(BaseHandler):
 
 
 class TickerHandler(BaseHandler):
+    executor = ThreadPoolExecutor(max_workers=1)
+
     def initialize(self):
         self.rhash = None
 
@@ -203,13 +208,18 @@ class TickerHandler(BaseHandler):
     def ticker(self):
         return self.application.ticker
 
+    @tornado.concurrent.run_on_executor
+    def tick(self):
+        self.ticker.recompute_rhash()
+        self.ticker.tick()
+
+    @tornado.gen.coroutine
     @tornado.web.authenticated
     @BaseHandler.authorized
     def get(self, rhash):
         if self.ticker.check_rhash(rhash):
             self.render("clicky_pause.html")
-            self.ticker.recompute_rhash()
-            self.ticker.tick()
+            yield self.tick()
         else:
             self.render("clicky.html", code=self.ticker.rhash)
 
